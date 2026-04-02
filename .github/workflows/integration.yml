@@ -1,0 +1,67 @@
+name: Encapso Ecosystem Integration
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [module_updated]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Checkout Encapso Parent
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: Encapso/encapso-parent
+          path: encapso-parent
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout Encapso API
+        uses: actions/checkout@v4
+        with:
+          repository: Encapso/encapso
+          path: encapso
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout Encapso Engine
+        uses: actions/checkout@v4
+        with:
+          repository: Encapso/encapso-engine
+          path: encapso-engine
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout Encapso Processor
+        uses: actions/checkout@v4
+        with:
+          repository: Encapso/encapso-processor
+          path: encapso-processor
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout Encapso Plugin
+        uses: actions/checkout@v4
+        with:
+          repository: Encapso/encapso-intellij
+          path: encapso-intellij
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Atomic Installation
+        run: |
+          mvn -B install -f encapso-parent/pom.xml
+          mvn -B install -f encapso/pom.xml
+          mvn -B install -f encapso-engine/pom.xml
+          mvn -B install -f encapso-processor/pom.xml
+          
+      - name: Plugin Verification
+        run: |
+          cd encapso-intellij
+          ./gradlew build
