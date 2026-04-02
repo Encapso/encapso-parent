@@ -1,0 +1,50 @@
+name: Encapso Reusable Maven Build
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Checkout Action Config
+        if: github.repository != 'Encapso/encapso-parent'
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: encapso/encapso-parent
+          path: _action_files
+        
+      - name: Link Action Config (Parent Only)
+        if: github.repository == 'Encapso/encapso-parent'
+        run: ln -s . _action_files
+
+      - name: Extract Java Version
+        id: java-version
+        run: |
+          # Read from the downloaded action files instead of the caller's root
+          VERSION=$(grep -oP '(?<=<java.version>)[^<]+' _action_files/pom.xml)
+          
+          if [ -z "$VERSION" ]; then VERSION="17"; fi 
+          
+          echo "Extracted version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v5.2.0
+        with:
+          java-version: ${{ steps.java-version.outputs.version }}
+          distribution: 'temurin'
+          cache: 'maven'
+          server-id: github
+
+      - name: Run Build
+        if: github.ref != 'refs/heads/develop'
+        run: mvn -B -s _action_files/.github/maven/settings.xml clean verify
+          
+      - name: Deploy Snapshot to GitHub Packages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+        run: mvn -B -s _action_files/.github/maven/settings.xml clean deploy -DaltDeploymentRepository=github::https://maven.pkg.github.com/${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
